@@ -62,10 +62,11 @@ builder.Services.AddOpenTelemetry()
             .AddOtlpExporter();
     });
 
-builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<IIdempotencyRepository, IdempotencyRepository>();
+builder.Services.AddScoped<IOutboxRepository, OutboxRepository>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<ISessionService, MockSessionService>();
 builder.Services.AddScoped<IAntiFraudClient, MockAntiFraudClient>();
 builder.Services.AddScoped<IBalanceClient, MockBalanceClient>();

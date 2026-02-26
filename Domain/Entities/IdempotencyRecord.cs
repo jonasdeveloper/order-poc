@@ -7,7 +7,7 @@ public class IdempotencyRecord
     public Guid OrderId { get; private set; }
     public DateTime CreatedAt { get; private set; }
 
-    private IdempotencyRecord() { } // EF
+    private IdempotencyRecord() { }
 
     public IdempotencyRecord(string key, Guid orderId)
     {

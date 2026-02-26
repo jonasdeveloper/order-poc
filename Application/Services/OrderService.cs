@@ -1,3 +1,4 @@
+using System.Text.Json;
 using OrderApi.Application.Interfaces;
 using OrderApi.Application.Interfaces.Application.Interfaces;
 using OrderApi.Domain.Entities;
@@ -12,13 +13,15 @@ public class OrderService : IOrderService
 {
     private readonly IOrderRepository _orderRepository;
     private readonly IIdempotencyRepository _idempotencyRepository;
+    private readonly IOutboxRepository _outboxRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ISessionService _session;
     private readonly IAntiFraudClient _antiFraud;
     private readonly IBalanceClient _balance;
 
     public OrderService(IOrderRepository orderRepository, IIdempotencyRepository idempotencyRepository,
-        IUnitOfWork unitOfWork, ISessionService session, IAntiFraudClient antiFraud, IBalanceClient balance)
+        IUnitOfWork unitOfWork, ISessionService session, IAntiFraudClient antiFraud, IBalanceClient balance,
+        IOutboxRepository outboxRepository)
     {
         _orderRepository = orderRepository;
         _idempotencyRepository = idempotencyRepository;
@@ -26,6 +29,7 @@ public class OrderService : IOrderService
         _session = session;
         _antiFraud = antiFraud;
         _balance = balance;
+        _outboxRepository = outboxRepository;
     }
 
     public async Task<OrderResponseDTO> CreateAsync(OrderRequestDTO request, string idempotencyKey, string bearerToken)
@@ -119,10 +123,16 @@ public class OrderService : IOrderService
         var order = new Order(request, userId);
         await _orderRepository.AddAsync(order);
         await _idempotencyRepository.AddAsync(new IdempotencyRecord(idempotencyKey, order.Id));
-        await _unitOfWork.CommitAsync();
 
         var orderResponse = new OrderResponseDTO(order.Id, order.UserId, order.Amount, order.Asset, order.Type, order.Status);
-        Log.Information("New order created with id {OrderId} for idempotency key {IdempotencyKey}", orderResponse.Id,
+
+        var payload = JsonSerializer.Serialize(orderResponse);
+        
+        await _outboxRepository.AddAsync(new OutboxEvent("OrderCreated", payload));
+
+        await _unitOfWork.CommitAsync();
+        
+        Log.Information("New order created with id {OrderId} for idempotency key {IdempotencyKey} and outbox register success", orderResponse.Id,
             idempotencyKey);
         return orderResponse;
     }
