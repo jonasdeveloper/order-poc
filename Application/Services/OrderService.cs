@@ -30,30 +30,20 @@ public class OrderService : IOrderService
 
     public async Task<OrderResponseDTO> CreateAsync(OrderRequestDTO request, string idempotencyKey, string bearerToken)
     {
-        try
-        {
-            ValidHeader(request, idempotencyKey, bearerToken);
+        ValidHeader(request, idempotencyKey, bearerToken);
 
-            var existingOrderId = await _idempotencyRepository.GetByKeyAsync(idempotencyKey);
+        var existingOrderId = await _idempotencyRepository.GetByKeyAsync(idempotencyKey);
 
-            if (existingOrderId != null)
-            {
-                return await GetExistingOrderAsync(existingOrderId.OrderId);
-            }
-            
-            var userId = await GetUserId(bearerToken);
+        if (existingOrderId != null)
+            return await GetExistingOrderAsync(existingOrderId.OrderId);
 
-            await VerifyFraud(request, userId);
+        var userId = await GetUserId(bearerToken);
 
-            await ReserveAmount(request, userId);
+        await VerifyFraud(request, userId);
 
-            return await ProcessNewOrderAsync(request, idempotencyKey, userId);
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "An error occured while processing order request");
-            throw new Exception($"Error processing order with idempotency key {idempotencyKey}: {ex.Message}", ex);
-        }
+        await ReserveAmount(request, userId);
+
+        return await ProcessNewOrderAsync(request, idempotencyKey, userId);
     }
 
     private static void ValidHeader(OrderRequestDTO? request, string idempotencyKey, string bearerToken)
@@ -107,7 +97,7 @@ public class OrderService : IOrderService
         if (isFraud)
         {
             Log.Warning("Fraud detected for user_id={UserId} amount={Amount}", userId, request.Amount);
-            throw new FraudException("Transaction flagged as fraud.");
+            throw new FraudException();
         }
     }
     

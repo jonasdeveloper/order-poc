@@ -11,7 +11,7 @@ public class MockBalanceClient : IBalanceClient
         if (amount > 5000m)
         {
             Log.Error("User {UserId} has insufficient balance to reserve {Amount}", userId, amount);
-            throw new BalanceException("Insufficient balance");
+            throw new InsufficientBalanceException();
         }
         return Task.CompletedTask;
     }

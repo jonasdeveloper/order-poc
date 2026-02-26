@@ -1,8 +1,8 @@
 namespace OrderApi.Domain.Exceptions;
 
-public class FraudException : Exception
+public class FraudException : DomainException
 {
-    public FraudException(string message) : base(message)
+    public FraudException() : base("ORDER_FRAUD_DETECTED", "Transaction flagged as fraud.")
     {
     }
 }
