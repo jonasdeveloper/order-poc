@@ -1,6 +1,5 @@
-using Microsoft.Extensions.Hosting;
-using Serilog;
 using OrderApi.Application.Interfaces;
+using Serilog;
 
 namespace OrderApi.Infrastructure.Outbox;
 
@@ -19,6 +18,7 @@ public class OutboxPublisherWorker : BackgroundService
         {
             using var scope = _scopeFactory.CreateScope();
             var outboxRepo = scope.ServiceProvider.GetRequiredService<IOutboxRepository>();
+            var publisher = scope.ServiceProvider.GetRequiredService<IQueuePublisher>();
 
             var pending = await outboxRepo.GetPendingAsync(take: 10);
 
@@ -28,7 +28,7 @@ public class OutboxPublisherWorker : BackgroundService
                 {
                     Log.Information("Publishing outbox event id={OutboxId} type={Type}", evt.Id, evt.Type);
 
-                    //TODO: SQS publish
+                    await publisher.PublishToOrderQueueAsync(evt.Payload, stoppingToken);
 
                     evt.MarkProcessed();
                 }

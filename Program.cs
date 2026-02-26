@@ -11,6 +11,7 @@ using Serilog;
 using Serilog.Events;
 using OrderApi.Infrastructure.Observability;
 using OrderApi.Infrastructure.External;
+using OrderApi.Infrastructure.Messaging;
 using OrderApi.Infrastructure.Outbox;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -72,6 +73,8 @@ builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<ISessionService, MockSessionService>();
 builder.Services.AddScoped<IAntiFraudClient, MockAntiFraudClient>();
 builder.Services.AddScoped<IBalanceClient, MockBalanceClient>();
+builder.Services.Configure<AwsOptions>(builder.Configuration.GetSection("Aws"));
+builder.Services.AddSingleton<IQueuePublisher, SqsQueuePublisher>();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
