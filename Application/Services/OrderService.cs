@@ -61,7 +61,7 @@ public class OrderService : IOrderService
 
         await _outboxWriter.EnqueueAsync(
             type: "OrderCreated",
-            payload: new OrderCreatedEvent(order.Id, order.UserId, order.Amount)
+            payload: new OrderCreatedEvent(order.Id, order.UserId, order.Amount, order.Asset, order.Type)
         );
 
         await _uow.CommitAsync();
