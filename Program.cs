@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using OrderApi.Infrastructure.Persistence;
 using OrderApi.Application.Interfaces;
 using OrderApi.Application.Services;
@@ -7,6 +8,7 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using OpenTelemetry.Metrics;
 using OrderApi.Application.Interfaces.Application.Interfaces;
+using OrderApi.Infrastructure.Consumers;
 using Serilog;
 using Serilog.Events;
 using OrderApi.Infrastructure.Observability;
@@ -75,22 +77,34 @@ builder.Services.AddScoped<IAntiFraudClient, MockAntiFraudClient>();
 builder.Services.AddScoped<IBalanceClient, MockBalanceClient>();
 builder.Services.Configure<AwsOptions>(builder.Configuration.GetSection("Aws"));
 builder.Services.AddSingleton<IQueuePublisher, SqsQueuePublisher>();
+builder.Services.AddScoped<IOrderProcessor, MockOrderProcessor>();
+builder.Services.AddHostedService<OrderConsumerWorker>();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddHostedService<OutboxPublisherWorker>();
+builder.Services.Configure<HostOptions>(o =>
+{
+    o.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore;
+});
 
 builder.Services.AddDbContext<OrderDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 var app = builder.Build();
 
+app.Lifetime.ApplicationStarted.Register(() =>
+{
+    var cfg = app.Services.GetRequiredService<IOptions<AwsOptions>>().Value;
+    Log.Information("AwsOptions loaded: Region={Region} SqsEndpoint={Endpoint} QueueName={Queue}",
+        cfg.Region, cfg.SqsEndpoint, cfg.OrderQueueName);
+});
+
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<ExceptionMiddleware>();
 
 app.UseSerilogRequestLogging(opts =>
 {
-    // trace_id/span_id automaticamente via Activity
     opts.EnrichDiagnosticContext = (diag, http) =>
     {
         diag.Set("trace_id", System.Diagnostics.Activity.Current?.TraceId.ToString());
