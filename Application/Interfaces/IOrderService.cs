@@ -4,6 +4,6 @@ namespace OrderApi.Application.Interfaces;
 
 public interface IOrderService
 {
-    Task<OrderResponseDTO> CreateAsync(OrderRequestDTO order);
+    Task<OrderResponseDTO> CreateAsync(OrderRequestDTO order, string idempotencyKey);
     Task<OrderResponseDTO?> GetByIdAsync(Guid id);
 }

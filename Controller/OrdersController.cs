@@ -1,9 +1,7 @@
 using OrderApi.Application.Interfaces;
 using OrderApi.DTO;
-
+using Serilog;
 using Microsoft.AspNetCore.Mvc;
-using OrderApi.Domain.Entities;
-using OrderApi.Infrastructure.Persistence;
 
 namespace OrderApi.Controllers;
 
@@ -21,7 +19,15 @@ public class OrdersController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] OrderRequestDTO request)
     {
-        var order = await _service.CreateAsync(request);
+        Log.Information("Requesting POST/orders with asset={Asset}", request.Asset);
+
+        if (!Request.Headers.TryGetValue("Idempotency-Key", out var idempotencyKey) || string.IsNullOrEmpty(idempotencyKey))
+        {
+            return BadRequest("Idempotency-Key header is required.");
+        }
+
+        Log.Information("Processing purchase order amount={Amount} idempotency_key={IdemKey}", request, idempotencyKey);
+        var order = await _service.CreateAsync(request, idempotencyKey!);
         return CreatedAtAction(nameof(GetById), new { id = order.Id }, order);
     }
 
