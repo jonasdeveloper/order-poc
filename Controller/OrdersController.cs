@@ -20,15 +20,25 @@ public class OrdersController : ControllerBase
     public async Task<IActionResult> Create([FromBody] OrderRequestDTO request)
     {
         Log.Information("Requesting POST/orders with asset={Asset}", request.Asset);
-
-        if (!Request.Headers.TryGetValue("Idempotency-Key", out var idempotencyKey) || string.IsNullOrEmpty(idempotencyKey))
-        {
-            return BadRequest("Idempotency-Key header is required.");
-        }
+        
+        var token = Request.Headers.Authorization.ToString();
+        Request.Headers.TryGetValue("Idempotency-Key", out var idempotencyKey);
 
         Log.Information("Processing purchase order amount={Amount} idempotency_key={IdemKey}", request, idempotencyKey);
-        var order = await _service.CreateAsync(request, idempotencyKey!);
-        return CreatedAtAction(nameof(GetById), new { id = order.Id }, order);
+        
+        try
+        {
+            var order = await _service.CreateAsync(request, idempotencyKey!, token);
+            return CreatedAtAction(nameof(GetById), new { id = order.Id }, order);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Unauthorized();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
     }
 
     [HttpGet("{id}")]

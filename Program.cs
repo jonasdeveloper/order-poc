@@ -6,9 +6,11 @@ using OrderApi.Infrastructure.Repositories;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using OpenTelemetry.Metrics;
+using OrderApi.Application.Interfaces.Application.Interfaces;
 using Serilog;
 using Serilog.Events;
 using OrderApi.Infrastructure.Observability;
+using OrderApi.Infrastructure.External;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -64,6 +66,9 @@ builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<IIdempotencyRepository, IdempotencyRepository>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+builder.Services.AddScoped<ISessionService, MockSessionService>();
+builder.Services.AddScoped<IAntiFraudClient, MockAntiFraudClient>();
+builder.Services.AddScoped<IBalanceClient, MockBalanceClient>();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -74,6 +79,7 @@ builder.Services.AddDbContext<OrderDbContext>(options =>
 var app = builder.Build();
 
 app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseMiddleware<ExceptionMiddleware>();
 
 app.UseSerilogRequestLogging(opts =>
 {

@@ -6,6 +6,8 @@ namespace OrderApi.Domain.Entities;
 public class Order
 {
     public Guid Id { get; private set; }
+    
+    public Guid UserId { get; private set; }
     public decimal Amount { get; private set; }
     
     public string Status { get; private set; } = default!;
@@ -18,9 +20,10 @@ public class Order
 
     private Order() { }
 
-    public Order(OrderRequestDTO orderRequestRequest)
+    public Order(OrderRequestDTO orderRequestRequest, Guid userId)
     {
         Id = Guid.NewGuid();
+        UserId = userId;
         Amount = orderRequestRequest.Amount;
         Type = orderRequestRequest.Type;
         Asset = orderRequestRequest.Asset;
