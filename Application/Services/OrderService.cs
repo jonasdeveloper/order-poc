@@ -1,4 +1,5 @@
 using System.Text.Json;
+using OrderApi.Application.Events;
 using OrderApi.Application.Interfaces;
 using OrderApi.Application.Interfaces.Application.Interfaces;
 using OrderApi.Domain.Entities;
@@ -11,43 +12,63 @@ namespace OrderApi.Application.Services;
 
 public class OrderService : IOrderService
 {
-    private readonly IOrderRepository _orderRepository;
-    private readonly IIdempotencyRepository _idempotencyRepository;
-    private readonly IOutboxRepository _outboxRepository;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly IOrderRepository _orders;
+    private readonly IIdempotencyRepository _idem;
     private readonly ISessionService _session;
     private readonly IAntiFraudClient _antiFraud;
     private readonly IBalanceClient _balance;
+    private readonly IOutboxWriter _outboxWriter;
+    private readonly IUnitOfWork _uow;
 
-    public OrderService(IOrderRepository orderRepository, IIdempotencyRepository idempotencyRepository,
-        IUnitOfWork unitOfWork, ISessionService session, IAntiFraudClient antiFraud, IBalanceClient balance,
-        IOutboxRepository outboxRepository)
+    public OrderService(
+        IOrderRepository orders,
+        IIdempotencyRepository idem,
+        ISessionService session,
+        IAntiFraudClient antiFraud,
+        IBalanceClient balance,
+        IOutboxWriter outboxWriter,
+        IUnitOfWork uow)
     {
-        _orderRepository = orderRepository;
-        _idempotencyRepository = idempotencyRepository;
-        _unitOfWork = unitOfWork;
+        _orders = orders;
+        _idem = idem;
         _session = session;
         _antiFraud = antiFraud;
         _balance = balance;
-        _outboxRepository = outboxRepository;
+        _outboxWriter = outboxWriter;
+        _uow = uow;
     }
 
     public async Task<OrderResponseDTO> CreateAsync(OrderRequestDTO request, string idempotencyKey, string bearerToken)
     {
         ValidHeader(request, idempotencyKey, bearerToken);
 
-        var existingOrderId = await _idempotencyRepository.GetByKeyAsync(idempotencyKey);
+        var existing = await _idem.GetByKeyAsync(idempotencyKey);
+        if (existing != null)
+            return await GetExistingOrderAsync(existing.OrderId);
 
-        if (existingOrderId != null)
-            return await GetExistingOrderAsync(existingOrderId.OrderId);
+        var userId = await _session.GetUserIdAsync(bearerToken);
 
-        var userId = await GetUserId(bearerToken);
+        var isFraud = await _antiFraud.IsFraudAsync(userId, request.Amount);
+        if (isFraud)
+            throw new FraudException();
 
-        await VerifyFraud(request, userId);
+        await _balance.ReserveAsync(userId, request.Amount);
 
-        await ReserveAmount(request, userId);
+        var order = new Order(request, userId);
+        await _orders.AddAsync(order);
 
-        return await ProcessNewOrderAsync(request, idempotencyKey, userId);
+        await _idem.AddAsync(new IdempotencyRecord(idempotencyKey, order.Id));
+
+        await _outboxWriter.EnqueueAsync(
+            type: "OrderCreated",
+            payload: new OrderCreatedEvent(order.Id, order.UserId, order.Amount)
+        );
+
+        await _uow.CommitAsync();
+
+        Log.Information("Order created order_id={OrderId} user_id={UserId}", order.Id, userId);
+
+        return new OrderResponseDTO(order.Id, order.UserId, order.Amount, order.Asset, order.Type, order.Status);
     }
 
     private static void ValidHeader(OrderRequestDTO? request, string idempotencyKey, string bearerToken)
@@ -73,7 +94,7 @@ public class OrderService : IOrderService
 
     public async Task<OrderResponseDTO?> GetByIdAsync(Guid id)
     {
-        var order = await _orderRepository.GetByIdAsync(id);
+        var order = await _orders.GetByIdAsync(id);
         if (order == null) return null;
         var orderResponse = new OrderResponseDTO(order.Id, order.UserId, order.Amount, order.Asset, order.Type, order.Status);
         return orderResponse;
@@ -81,7 +102,7 @@ public class OrderService : IOrderService
 
     private async Task<OrderResponseDTO> GetExistingOrderAsync(Guid orderId)
     {
-        var order = await _orderRepository.GetByIdAsync(orderId);
+        var order = await _orders.GetByIdAsync(orderId);
 
         if (order == null)
         {
@@ -93,47 +114,5 @@ public class OrderService : IOrderService
         Log.Information("Idempotent request - returning existing order {OrderId} with status {Status}",
             orderResponseDto.Id, orderResponseDto.Status);
         return orderResponseDto;
-    }
-    
-    private async Task VerifyFraud(OrderRequestDTO request, Guid userId)
-    {
-        var isFraud = await _antiFraud.IsFraudAsync(userId, request.Amount);
-        if (isFraud)
-        {
-            Log.Warning("Fraud detected for user_id={UserId} amount={Amount}", userId, request.Amount);
-            throw new FraudException();
-        }
-    }
-    
-    private async Task ReserveAmount(OrderRequestDTO request, Guid userId)
-    {
-        await _balance.ReserveAsync(userId, request.Amount);
-        Log.Information("Balance reserved for user_id={UserId} amount={Amount}", userId, request.Amount);
-    }
-
-    private async Task<Guid> GetUserId(string bearerToken)
-    {
-        var userId = await _session.GetUserIdAsync(bearerToken);
-        Log.Information("Resolved user_id={UserId}", userId);
-        return userId;
-    }
-
-    private async Task<OrderResponseDTO> ProcessNewOrderAsync(OrderRequestDTO request, string idempotencyKey, Guid userId)
-    {
-        var order = new Order(request, userId);
-        await _orderRepository.AddAsync(order);
-        await _idempotencyRepository.AddAsync(new IdempotencyRecord(idempotencyKey, order.Id));
-
-        var orderResponse = new OrderResponseDTO(order.Id, order.UserId, order.Amount, order.Asset, order.Type, order.Status);
-
-        var payload = JsonSerializer.Serialize(orderResponse);
-        
-        await _outboxRepository.AddAsync(new OutboxEvent("OrderCreated", payload));
-
-        await _unitOfWork.CommitAsync();
-        
-        Log.Information("New order created with id {OrderId} for idempotency key {IdempotencyKey} and outbox register success", orderResponse.Id,
-            idempotencyKey);
-        return orderResponse;
     }
 }

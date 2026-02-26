@@ -11,6 +11,7 @@ using Serilog;
 using Serilog.Events;
 using OrderApi.Infrastructure.Observability;
 using OrderApi.Infrastructure.External;
+using OrderApi.Infrastructure.Outbox;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -66,6 +67,7 @@ builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<IIdempotencyRepository, IdempotencyRepository>();
 builder.Services.AddScoped<IOutboxRepository, OutboxRepository>();
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+builder.Services.AddScoped<IOutboxWriter, OutboxWriter>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<ISessionService, MockSessionService>();
 builder.Services.AddScoped<IAntiFraudClient, MockAntiFraudClient>();
@@ -73,6 +75,7 @@ builder.Services.AddScoped<IBalanceClient, MockBalanceClient>();
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddHostedService<OutboxPublisherWorker>();
 
 builder.Services.AddDbContext<OrderDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
