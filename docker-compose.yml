@@ -8,3 +8,12 @@ services:
       - AWS_DEFAULT_REGION=sa-east-1
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: orderdb
+    ports:
+      - "5432:5432"
