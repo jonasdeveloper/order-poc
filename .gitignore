@@ -1,0 +1,66 @@
+## --- .NET / C# ---
+# Arquivos de compilação e saída
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+
+# Logs e arquivos de runtime
+*.log
+*.pfx
+*.publishsettings
+
+# User-specific files (configurações de usuário da IDE)
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+## --- NuGet ---
+# Não ignore o arquivo .config do NuGet, mas ignore os pacotes baixados
+# O cache de pacotes deve ser restaurado via 'dotnet restore'
+packages/
+!packages/build/
+*.nupkg
+
+## --- Visual Studio Code ---
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+## --- Visual Studio ---
+.vs/
+# Arquivos gerados pelo MSBuild
+AppPackages/
+BundleArtifacts/
+_Chm/
+.buildlog
+
+## --- JetBrains (Rider) ---
+.idea/
+*.sln.iml
+
+## --- Ferramentas de Teste e Cobertura ---
+TestResults/
+*.sequenced
+*.coveragexml
+*.coverage
+
+## --- Azure / Cloud ---
+# Segredos locais de desenvolvimento (IMPORTANTE)
+secrets.json
+.azure/
+.env
+
+## --- Sistema Operacional ---
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
