@@ -1,9 +1,11 @@
 # Order Processing POC — Event Driven Architecture (.NET + SQS + Outbox)
 
-```md
 ## 📊 Diagrama
-![architecture.png](architecture.png)
-```
+
+
+<img width="1757" height="899" alt="architecture" src="https://github.com/user-attachments/assets/3899ad28-da31-47e3-9606-c14b4a3b4b6e" />
+
+
 
 POC de processamento de ordens de compra simulando fluxo de corretora, com foco em:
 
