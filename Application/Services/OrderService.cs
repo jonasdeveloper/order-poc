@@ -52,11 +52,10 @@ public class OrderService : IOrderService
         if (isFraud)
             throw new FraudException();
 
-        await _balance.ReserveAsync(userId, request.Amount);
-
         var order = new Order(request, userId);
-        await _orders.AddAsync(order);
 
+        await _orders.AddAsync(order);
+        await _balance.ReserveAsync(order.Id, userId, request.Amount);
         await _idem.AddAsync(new IdempotencyRecord(idempotencyKey, order.Id));
 
         await _outboxWriter.EnqueueAsync(

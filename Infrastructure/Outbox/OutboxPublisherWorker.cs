@@ -1,4 +1,6 @@
+using Microsoft.Extensions.Options;
 using OrderApi.Application.Interfaces;
+using OrderApi.Infrastructure.Messaging;
 using Serilog;
 
 namespace OrderApi.Infrastructure.Outbox;
@@ -6,6 +8,7 @@ namespace OrderApi.Infrastructure.Outbox;
 public class OutboxPublisherWorker : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly AwsOptions _opt;
 
     public OutboxPublisherWorker(IServiceScopeFactory scopeFactory)
     {
@@ -19,6 +22,7 @@ public class OutboxPublisherWorker : BackgroundService
             using var scope = _scopeFactory.CreateScope();
             var outboxRepo = scope.ServiceProvider.GetRequiredService<IOutboxRepository>();
             var publisher = scope.ServiceProvider.GetRequiredService<IQueuePublisher>();
+            var aws = scope.ServiceProvider.GetRequiredService<IOptions<AwsOptions>>().Value;
 
             var pending = await outboxRepo.GetPendingAsync(take: 10);
 
@@ -28,7 +32,7 @@ public class OutboxPublisherWorker : BackgroundService
                 {
                     Log.Information("Publishing outbox event id={OutboxId} type={Type}", evt.Id, evt.Type);
 
-                    await publisher.PublishToOrderQueueAsync(evt.Payload, stoppingToken);
+                    await publisher.PublishAsync(aws.OrderQueueName,evt.Payload, stoppingToken);
 
                     evt.MarkProcessed();
                 }

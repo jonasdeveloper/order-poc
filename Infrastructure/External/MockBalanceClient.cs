@@ -1,18 +1,41 @@
-using OrderApi.Application.Interfaces;
-using OrderApi.Domain.Exceptions;
 using Serilog;
+using OrderApi.Application.Interfaces;
+using OrderApi.Domain.Entities;
+using OrderApi.Domain.Exceptions;
 
 namespace OrderApi.Infrastructure.External;
 
 public class MockBalanceClient : IBalanceClient
 {
-    public Task ReserveAsync(Guid userId, decimal amount)
+    private readonly IBalanceReservationRepository _repo;
+
+    public MockBalanceClient(IBalanceReservationRepository repo)
+    {
+        _repo = repo;
+    }
+
+    public async Task ReserveAsync(Guid orderId, Guid userId, decimal amount)
     {
         if (amount > 5000m)
-        {
-            Log.Error("User {UserId} has insufficient balance to reserve {Amount}", userId, amount);
             throw new InsufficientBalanceException();
+
+        await _repo.AddAsync(new BalanceReservation(orderId, userId, amount));
+        Log.Information("Balance RESERVED order_id={OrderId} user_id={UserId} amount={Amount}", orderId, userId, amount);
+    }
+
+    public async Task CompensateAsync(Guid orderId, bool success)
+    {
+        var r = await _repo.GetByOrderIdForUpdateAsync(orderId);
+        if (r == null)
+        {
+            Log.Warning("No reservation found for order_id={OrderId}", orderId);
+            return;
         }
-        return Task.CompletedTask;
+
+        if (success) r.Confirm();
+        else r.Release();
+
+        Log.Information("Balance COMPENSATED order_id={OrderId} success={Success} new_status={Status}",
+            orderId, success, r.Status);
     }
 }

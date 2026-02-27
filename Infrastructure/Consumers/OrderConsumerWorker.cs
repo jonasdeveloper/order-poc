@@ -57,7 +57,7 @@ public class OrderConsumerWorker : BackgroundService
         {
             var received = await ReceiveMessageResponse(stoppingToken);
             var msgs = received.Messages ?? new List<Message>();
-
+            
             if (msgs.Count == 0)
                 continue;
 
@@ -73,6 +73,8 @@ public class OrderConsumerWorker : BackgroundService
                 var processor = scope.ServiceProvider.GetRequiredService<IOrderProcessor>();
                 var orderRepo = scope.ServiceProvider.GetRequiredService<IOrderRepository>();
                 var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+                var publisher = scope.ServiceProvider.GetRequiredService<IQueuePublisher>();
+                var aws = scope.ServiceProvider.GetRequiredService<IOptions<AwsOptions>>().Value;
 
                 try
                 {
@@ -92,7 +94,14 @@ public class OrderConsumerWorker : BackgroundService
                     order.MarkAsProcessed();
                     await uow.CommitAsync();
                     await _sqs.DeleteMessageAsync(_queueUrl, msg.ReceiptHandle, stoppingToken);
-                    Log.Information("Order {OrderId} processed successfully", evt.OrderId);
+                    Log.Information("Order {OrderId} processed successfully new state {Status}", evt.OrderId, order.Status);
+
+                    await publisher.PublishAsync(
+                        aws.BalanceQueueName,
+                        System.Text.Json.JsonSerializer.Serialize(new OrderSettledEvent(evt.OrderId, true)),
+                        stoppingToken
+                    );
+
                 }
                 catch (Exception ex)
                 {

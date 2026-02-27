@@ -2,5 +2,5 @@ namespace OrderApi.Application.Interfaces;
 
 public interface IQueuePublisher
 {
-    Task PublishToOrderQueueAsync(string messageBody, CancellationToken ct);
+    Task PublishAsync(string queueName, string messageBody, CancellationToken ct);
 }
