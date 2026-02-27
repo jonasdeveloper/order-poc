@@ -144,7 +144,7 @@ POST /api/orders
 }
 ```
 
-### Heards obrigatórios
+### Headers obrigatórios
 ```bash
 Idempotency-Key: qualquer-string-unica
 Authorization: Bearer fake-token
